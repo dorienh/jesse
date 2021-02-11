@@ -3,7 +3,8 @@
 I am a professor in AI and need a well documented and best practices used PyTorch script for the following task (I would do it myself, but no time to code):
 
 - load all of the .csv files included as data (there will be more int he future, so perhaps load all files in folder)
-- do a 30-70% test training split: 30% last rows of each of the files
+- the files should be normalized per file
+- do a 20-10-70% test validation training split: 20% last rows of each of the files is for test. 
 - model input:
 - t_i-m until t_i rows/timesteps (with m customisable, tell me where I can change it, say m is 16 as an example) of columns:Volume,Open,High,Low,Close,ATR,CC,ODR,Trend,WM,Band, [please remove Buy/Sell columns/last_pivot]
 - Btm and Top column can be given as input until time t_i-s (not s is not m, but is smaller then m)
