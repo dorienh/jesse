@@ -6,7 +6,8 @@ I am a professor in AI and need a well documented and best practices used PyTorc
 - the files should be normalized per file
 - do a 20-10-70% test validation training split: 20% last rows of each of the files is for test. 
 - model input:
-  - t_i-m until t_i rows/timesteps (with m customisable, tell me where I can change it, say m is 16 as an example) of columns:Volume,Open,High,Low,Close,ATR,CC,ODR,Trend,WM,Band, [please remove Buy/Sell columns/last_pivot]
+  - t_i-m until t_i rows/timesteps (with m customisable, tell me where I can change it, say m is 16 as an example) of columns:Volume,Open,High,Low,Close,ATR,CC,ODR,Trend,WM,Band, [please don't include Buy/Sell columns/last_pivot]
+  - Normalize data (min max scaler) per file
   - Optional switch (include yes or no): output column can be given as input until time t_i-s (s is not m, but is smaller then m)
 - model output (prediction):
   - One column that can be set in the beginning, for instance: Btm / Top column at timestep t_i-s until t_i [probably about 5 last time steps but it can be customisable again]
@@ -17,8 +18,10 @@ I am a professor in AI and need a well documented and best practices used PyTorc
   - Simple 2 layer FC
   - Wavenet (will need bigger input window, please document how to do this, this will be for minute data when I have it)
 
-- Add training/evaluation function with plot
-- Normalize data (min max scaler) per file
+- Add training/evaluation function with loss/accuracy plot for training, validaton, and test set
+- Output confusion matrix for test set
+- function to save / load model and predict based on small input dataframe (m rows)
+
 - batchnorm for training
 - Provide function to get prediction with easy instruction on how the input looks like (last m rows of the csv), output is Btm/Top with probability percentage or CE value.
 
