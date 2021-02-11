@@ -9,7 +9,7 @@ I am a professor in AI and need a well documented and best practices used PyTorc
   - t_i-m until t_i rows/timesteps (with m customisable, tell me where I can change it, say m is 16 as an example) of columns:Volume,Open,High,Low,Close,ATR,CC,ODR,Trend,WM,Band, [please remove Buy/Sell columns/last_pivot]
   - Btm and Top column can be given as input until time t_i-s (not s is not m, but is smaller then m)
 - model output (prediction):
-  - Btm / Top column at timestep t_i-s until t_i [probably about 5 last time steps but it can be customisable again]
+  - One column that can be set in the beginning, for nstance: Btm / Top column at timestep t_i-s until t_i [probably about 5 last time steps but it can be customisable again]
 - model is many to many (you predict Btm/Top for the last s timesteps (s can be set to 1 too). Switch between the following architectures:
   - Transformer
   - 2 layer LSTM
