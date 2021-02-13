@@ -1,0 +1,2 @@
+
+Feel free to make many subfolders and structure this as needed. I provide a sample LSTM with many shortcomings incase it’s of help. You can ignore it too. 
