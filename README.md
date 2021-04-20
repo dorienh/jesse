@@ -50,11 +50,10 @@ Please push regularly to the repository.
 
 I will want to have easy functions to create/train/predict on new data (from other sources), e.g.: 
 
-<code>
-my_model = Model_n-to-1(n=14, layers=3,...)
-results = my_model.train(epochs=6,device=gpu_1,data='datafolder',production=False, save='filename')
-my_model.load('filename')
-predictions = my_model.predict(test_data=my_dataframe)
-</code>
+  my_model = Model_n-to-1(n=14, layers=3,...)
+  results = my_model.train(epochs=6,device=gpu_1,data='datafolder',production=False, save='filename')
+  my_model.load('filename')
+  predictions = my_model.predict(test_data=my_dataframe)
+
 
 or a slightly better syntax if you can suggest it. 
