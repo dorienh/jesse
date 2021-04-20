@@ -2,6 +2,9 @@
 
 I am a professor in AI and need a well documented and best practices used PyTorch script for the following task (I would do it myself, but no time to code):
 
+
+
+Preprocessing [most already implemented, but needs error checking + PEP8 and improvements to file/class structure)]
 - load all of the .csv files included as data (there will be more int he future, so perhaps load all files in folder)
 - the files should be normalized per file
 - do a 20-10-70% test validation training split: 20% last rows of each of the files is for test. 
