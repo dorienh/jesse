@@ -7,7 +7,7 @@ I am a professor in AI and need a well documented and best practices used PyTorc
 1. Preprocessing [most already implemented, but needs error checking + PEP8 and improvements to file/class structure)]
 - load all of the .csv files included as data (there will be more in the future, so load all files in specified folder (either daily or hourly))
 - the files should be normalized per file
-- currently a filename token is given as input to the model, this can probably be remooved. 
+- currently a filename token is given as input to the model, this can probably be removed. 
 - do a 20-10-70% test validation training split: 20% last rows of each of the files is for test. 
 - provide a production option whereby all data is used for training
 - custum data loader with stratified sampling
