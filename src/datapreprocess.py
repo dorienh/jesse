@@ -7,16 +7,17 @@ import torch
 from torch.utils.data import DataLoader
 
 import tsfresh.utilities.dataframe_functions as df_utilities
+import torch.nn.functional as F
 
 from sklearn.preprocessing import LabelEncoder
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.decomposition import PCA
 from sklearn.model_selection import train_test_split
 
+from utils import custom_print
 import warnings
 
 warnings.filterwarnings("ignore")
-
 
 class Preprocess(object):
     def __init__(
@@ -24,8 +25,9 @@ class Preprocess(object):
         directory,
         y_cols,
         target,
+        last_x_days=14,
         add_crypto_id=False,
-        pca_components=10,
+        pca_components=None,
         filter_value=None,
         test_ratio=0.2,
         val_ratio=0.1,
@@ -38,26 +40,36 @@ class Preprocess(object):
         self.filter_value = filter_value
         self.test_ratio = test_ratio
         self.val_ratio = val_ratio
-
+        self.timeframe = last_x_days
         self._flagpreprocess = False
         self._flagtensors = False
+        if pca_components == None:
+            self.pca = False
+        else:
+            self.pca = True
 
     def _collect_files(self):
         files = glob(f"{self.directory}/*.csv")
+        custom_print("Collecting Files")
         self.dfs = [pd.read_csv(file) for file in files]
         self.cryptos = [os.path.split(file)[1].split("_")[1] for file in files]
-
+        custom_print("Filling Nan Values ✓")
+        custom_print("Imputing Nan Values ✓")
         for df in self.dfs:
+            col1 = df.columns[0]
+            if col1 != "date":
+                df.rename(columns={col1: "date"}, inplace=True)
             df.fillna(method="ffill", inplace=True)
             dates = df.date
             df.drop(columns=["date"], inplace=True)
             # This indirectly maps all BOOL values to 1's and 0's of type float64
             df *= 1.0
             # This function maps inf->max and -inf->min for each column
-            df_utilities.impute(df)
+            df = df_utilities.impute(df)
             df.insert(0, column="date", value=dates)
 
     def _split_data(self, X_list, y_list):
+        custom_print("Split Dataset into Train,Val,Test Set ✓")
         # This is an additional step to filter out any crypto df with less than a significant amount of data (atleast 1000 rows).
         # Completely optional
         if self.filter_value:
@@ -79,15 +91,33 @@ class Preprocess(object):
         y_val_list = []
 
         for i in range(len(X_list)):
-            X_train, X_test, y_train, y_test = train_test_split(
-                X_list[i], y_list[i], test_size=self.test_ratio, random_state=42
-            )  # 20% for test
-            X_train, X_val, y_train, y_val = train_test_split(
-                X_train,
-                y_train,
-                test_size=self.val_ratio / (1 - self.test_ratio),
-                random_state=42,
-            )  # 0.1/0.8 = 0.125 for val, since 0.8*0.125=10%
+            try:
+                X_train, X_test, y_train, y_test = train_test_split(
+                    X_list[i],
+                    y_list[i],
+                    test_size=self.test_ratio,
+                    random_state=42,
+                    stratify=y_list[i],
+                )  # 20% for test
+            except ValueError:
+                X_train, X_test, y_train, y_test = train_test_split(
+                    X_list[i], y_list[i], test_size=self.test_ratio, random_state=42,
+                )  # 20% for test
+            try:
+                X_train, X_val, y_train, y_val = train_test_split(
+                    X_train,
+                    y_train,
+                    test_size=self.val_ratio / (1 - self.test_ratio),
+                    random_state=42,
+                    stratify=y_train,
+                )  # 0.1/0.8 = 0.125 for val, since 0.8*0.125=10%
+            except ValueError:
+                X_train, X_val, y_train, y_val = train_test_split(
+                    X_train,
+                    y_train,
+                    test_size=self.val_ratio / (1 - self.test_ratio),
+                    random_state=42,
+                )
             X_train_list.append(X_train)
             y_train_list.append(y_train)
             X_test_list.append(X_test)
@@ -109,6 +139,7 @@ class Preprocess(object):
 
         for i, df in enumerate(self.dfs):
             if self.add_crypto_id:
+                custom_print("Adding Crypto ID column ✓")
                 le = LabelEncoder()
                 le.fit(self.cryptos)
 
@@ -131,6 +162,7 @@ class Preprocess(object):
 
     def _processinput(self, inputs):
         self.scalers = []  # list of scalers
+        custom_print("Min Max Normalisation on Dataset ✓")
         for i in range(len(inputs)):
             scaler = MinMaxScaler()
             if self.add_crypto_id:
@@ -142,28 +174,34 @@ class Preprocess(object):
                     inputs[i].copy().iloc[:, 1:]
                 )  # leaving out date column
             self.scalers.append(scaler)
-
-        self.pcas = []
-        for i, data in enumerate(inputs):
-            if "date" in data.columns:
-                data.index = data.date
-                del data["date"]
-            pca = PCA(n_components=self.pca_components)
-            if self.add_crypto_id:
-                non_reduced = np.array(data.iloc[:, :5])
-                # saving columns cryptoID, open,high, low and close
-                pca.fit(data.iloc[:, 5:])
-                reduced = pca.transform(data.iloc[:, 5:])
-                reduced = np.append(non_reduced, reduced, axis=1)
-            else:
-                non_reduced = np.array(data.iloc[:, :4])
-                # saving columns open,high, low and close
-                pca.fit(data.iloc[:, 4:])
-                reduced = pca.transform(data.iloc[:, 4:])
-                reduced = np.append(non_reduced, reduced, axis=1)
-            self.pcas.append(pca)
-            inputs[i] = reduced
-
+        if self.pca:
+            custom_print("PCA on Dataset ✓")
+            self.pcas = []
+            for i, data in enumerate(inputs):
+                if "date" in data.columns:
+                    data.index = data.date
+                    del data["date"]
+                pca = PCA(n_components=self.pca_components)
+                if self.add_crypto_id:
+                    non_reduced = np.array(data.iloc[:, :5])
+                    # saving columns cryptoID, open,high, low and close
+                    pca.fit(data.iloc[:, 5:])
+                    reduced = pca.transform(data.iloc[:, 5:])
+                    reduced = np.append(non_reduced, reduced, axis=1)
+                else:
+                    non_reduced = np.array(data.iloc[:, :4])
+                    # saving columns open,high, low and close
+                    pca.fit(data.iloc[:, 4:])
+                    reduced = pca.transform(data.iloc[:, 4:])
+                    reduced = np.append(non_reduced, reduced, axis=1)
+                self.pcas.append(pca)
+                inputs[i] = reduced
+        else:
+            for i, data in enumerate(inputs):
+                if "date" in data.columns:
+                    data.index = data.date
+                    del data["date"]
+                    inputs[i] = data
         return inputs
 
     def _prepare_test_val_set(self, inputs_test, inputs_val):
@@ -180,18 +218,24 @@ class Preprocess(object):
                 # leaving out cryptoID column
                 X_test_mm.append(df)
                 X_test_mm[i].iloc[:, 1:] = test_mm
-                non_reduced = np.array(X_test_mm[i].iloc[:, :5])
-                # saving columns cryptoID, open,high, low and close
-                reduced = self.pcas[i].transform(X_test_mm[i].iloc[:, 5:])
-                reduced = np.append(non_reduced, reduced, axis=1)
+                if self.pca:
+                    non_reduced = np.array(X_test_mm[i].iloc[:, :5])
+                    # saving columns cryptoID, open,high, low and close
+                    reduced = self.pcas[i].transform(X_test_mm[i].iloc[:, 5:])
+                    reduced = np.append(non_reduced, reduced, axis=1)
+                else:
+                    reduced = X_test_mm[i].values
             else:
                 test_mm = self.scalers[i].transform(df.copy())
                 X_test_mm.append(df)
                 X_test_mm[i].iloc[:, 0:] = test_mm
-                non_reduced = np.array(X_test_mm[i].iloc[:, :4])
-                # saving columns open,high, low and close
-                reduced = self.pcas[i].transform(X_test_mm[i].iloc[:, 4:])
-                reduced = np.append(non_reduced, reduced, axis=1)
+                if self.pca:
+                    non_reduced = np.array(X_test_mm[i].iloc[:, :4])
+                    # saving columns open,high, low and close
+                    reduced = self.pcas[i].transform(X_test_mm[i].iloc[:, 4:])
+                    reduced = np.append(non_reduced, reduced, axis=1)
+                else:
+                    reduced = X_test_mm[i].values
 
             X_test_processed.append(reduced)
 
@@ -204,19 +248,24 @@ class Preprocess(object):
                 # leaving out cryptoID column
                 X_val_mm.append(df)
                 X_val_mm[i].iloc[:, 1:] = val_mm
-                non_reduced = np.array(X_val_mm[i].iloc[:, :5])
-                # saving columns cryptoID, open,high, low and close
-                reduced = self.pcas[i].transform(X_val_mm[i].iloc[:, 5:])
-                reduced = np.append(non_reduced, reduced, axis=1)
+                if self.pca:
+                    non_reduced = np.array(X_val_mm[i].iloc[:, :5])
+                    # saving columns cryptoID, open,high, low and close
+                    reduced = self.pcas[i].transform(X_val_mm[i].iloc[:, 5:])
+                    reduced = np.append(non_reduced, reduced, axis=1)
+                else:
+                    reduced = X_val_mm[i].values
             else:
                 val_mm = self.scalers[i].transform(df.copy())
                 X_val_mm.append(df)
                 X_val_mm[i].iloc[:, 0:] = val_mm
-                non_reduced = np.array(
-                    X_val_mm[i].iloc[:, :4]
-                )  # saving columns open,high, low and close
-                reduced = self.pcas[i].transform(X_val_mm[i].iloc[:, 4:])
-                reduced = np.append(non_reduced, reduced, axis=1)
+                if self.pca:
+                    non_reduced = np.array(X_val_mm[i].iloc[:, :4])
+                    # saving columns open,high, low and close
+                    reduced = self.pcas[i].transform(X_val_mm[i].iloc[:, 4:])
+                    reduced = np.append(non_reduced, reduced, axis=1)
+                else:
+                    reduced = X_val_mm[i].values
 
             X_val_processed.append(reduced)
 
@@ -261,8 +310,20 @@ class Preprocess(object):
         self.y_train = y_train
         self.y_test = y_test
         self.y_val = y_val
-
         self._flagpreprocess = True
+        self.X_train, self.y_train = self._convert_to_timeseries(
+            self.X_train, self.y_train, self.timeframe
+        )
+        self.X_val, self.y_val = self._convert_to_timeseries(
+            self.X_val, self.y_val, self.timeframe
+        )
+        self.X_test, self.y_test = self._convert_to_timeseries(
+            self.X_test, self.y_test, self.timeframe
+        )
+
+        print(f"X_train Shape {self.X_train.shape}, Y_train Shape {self.y_train.shape}")
+        print(f"X_test Shape {self.X_test.shape}, Y_test Shape{self.y_test.shape}")
+
         return (
             self.X_train,
             self.y_train,
@@ -271,6 +332,17 @@ class Preprocess(object):
             self.X_val,
             self.y_val,
         )
+
+    def _convert_to_timeseries(self, X, Y, timeframe):
+        x = []
+        y = []
+        for i in range(X.shape[0] // timeframe):
+            try:
+                y.append(Y[((i + 1) * timeframe) + 1])
+                x.append(X[i * timeframe : (i + 1) * timeframe])
+            except:
+                pass
+        return np.asarray(x), np.asarray(y)
 
     def prepare_tensors(self):
         if not self._flagpreprocess:
@@ -283,16 +355,7 @@ class Preprocess(object):
         self.y_test = torch.tensor(self.y_test, dtype=torch.int64)
         self.y_val = torch.tensor(self.y_val, dtype=torch.int64)
 
-        self.X_train = torch.reshape(
-            self.X_train, (self.X_train.shape[0], 1, self.X_train.shape[1])
-        )
-        self.X_test = torch.reshape(
-            self.X_test, (self.X_test.shape[0], 1, self.X_test.shape[1])
-        )
-        self.X_val_ = torch.reshape(
-            self.X_val, (self.X_val.shape[0], 1, self.X_val.shape[1])
-        )
-        self.inputshape = self.X_train.shape[1]
+        self.inputshape = self.X_train.shape
         self._flagtensors = True
         return (
             self.X_train,
@@ -308,6 +371,10 @@ class Preprocess(object):
             if not self._flagpreprocess:
                 self.process()
             self.prepare_tensors()
+        self.y_train = F.one_hot(self.y_train.squeeze(), num_classes=2)
+        self.y_test = F.one_hot(self.y_test.squeeze(), num_classes=2)
+        self.y_val = F.one_hot(self.y_val.squeeze(), num_classes=2)
+        print(self.y_train.shape,self.y_val.shape)
         train_data = []
         val_data = []
         test_data = []
@@ -323,7 +390,6 @@ class Preprocess(object):
         loader_train = DataLoader(train_data, batch_size=batch_size, shuffle=True)
         loader_val = DataLoader(val_data, batch_size=batch_size, shuffle=False)
         loader_test = DataLoader(test_data, batch_size=batch_size, shuffle=False)
-
         loaders = {"train": loader_train, "valid": loader_val, "test": loader_test}
 
         return loaders
@@ -340,19 +406,24 @@ class Preprocess(object):
         if self.add_crypto_id:
             test = scaler.transform(df.copy().iloc[:, 1:])
             df.iloc[:, 1:] = test
-            non_reduced = np.array(df.iloc[:, :5])
-            # saving columns cryptoID, open,high, low and close
-            reduced = pca[0].transform(df.iloc[:, 5:])
-            reduced = np.append(non_reduced, reduced, axis=1)
+            if self.pca:
+                non_reduced = np.array(df.iloc[:, :5])
+                # saving columns cryptoID, open,high, low and close
+                reduced = pca[0].transform(df.iloc[:, 5:])
+                reduced = np.append(non_reduced, reduced, axis=1)
+            else:
+                reduced = df.values
         else:
             test = scaler.transform(df.copy())
             df.iloc[:, 0:] = test
-            non_reduced = np.array(
-                df.iloc[:, :4]
-            )  # saving columns open,high, low and close
-            reduced = pca.transform(df.iloc[:, 4:])
-            reduced = np.append(non_reduced, reduced, axis=1)
-
+            if self.pca:
+                non_reduced = np.array(
+                    df.iloc[:, :4]
+                )  # saving columns open,high, low and close
+                reduced = pca.transform(df.iloc[:, 4:])
+                reduced = np.append(non_reduced, reduced, axis=1)
+            else:
+                reduced = df.values
         test = torch.tensor(reduced, dtype=torch.int64)
         test = torch.reshape(test, (test.shape[0], 1, test.shape[1]))
 
