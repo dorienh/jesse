@@ -145,7 +145,7 @@ class WaveNet_n_to_1(object):
 
     def predict(self, testdata, target=None):
         self.model.eval()
-        testdata = testdata.cuda()
+        testdata = testdata.to(self.device)
         predictions = self.model(testdata.float()).detach().numpy()
         idxs = np.unique(np.where(np.isnan(predictions))[0]).tolist()
         preds = np.delete(predictions.copy(), idxs, axis=0)
