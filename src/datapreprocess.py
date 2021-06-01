@@ -66,21 +66,30 @@ class Preprocess(object):
         # for each file in all files
         for df in self.dfs:
             col1 = df.columns[0]
+            # make sure first column is called date:
             if col1 != "date":
                 df.rename(columns={col1: "date"}, inplace=True)
+            # fill the NA values
             df.fillna(method="ffill", inplace=True)
             dates = df.date
+            # drop the first column:
             df.drop(columns=["date"], inplace=True)
-            # This indirectly maps all BOOL values to 1's and 0's of type float64
+            # This indirectly maps all BOOL values to 1's and 0's of type float64:
             df *= 1.0
-            # This function maps inf->max and -inf->min for each column
+            # This function maps inf->max and -inf->min for each column:
+            # todo, not sure this is the best strategy
             df = df_utilities.impute(df)
+            # inserting the date again??? todo why?
             df.insert(0, column="date", value=dates)
 
+
+    # split up the data in train/test/val x/y
     def _split_data(self, X_list, y_list):
+
         custom_print("Split Dataset into Train,Val,Test Set ✓")
         # This is an additional step to filter out any crypto df with less than a significant amount of data (atleast 1000 rows).
-        # Completely optional
+
+        # Completely optional - filter value could be batch size? todo
         if self.filter_value:
             X_above_1k = []
             y_above_1k = []
@@ -99,6 +108,9 @@ class Preprocess(object):
         X_val_list = []
         y_val_list = []
 
+
+        #bookmark
+        # for each element of the file list:
         for i in range(len(X_list)):
             try:
                 X_train, X_test, y_train, y_test = train_test_split(
@@ -146,12 +158,17 @@ class Preprocess(object):
     def _processtarget(self):
         self.targets = []  # This will contain all the output columns for each df
 
+        # for each cell in the file list
         for i, df in enumerate(self.dfs):
+
+            # if we are feeding crypto_id to the network: we add a column with the ID
             if self.add_crypto_id:
                 custom_print("Adding Crypto ID column ✓")
+                # add this as an integer label
                 le = LabelEncoder()
                 le.fit(self.cryptos)
 
+                # remove possible already existing crypto_id
                 if "CryptoID" in df.columns:
                     del df["CryptoID"]
 
@@ -160,18 +177,29 @@ class Preprocess(object):
                 )
                 # adding unique id's for cryptos as an additional feature
                 # to make sure our model learns the uniqueness of each crypto
+
+
             # This step is to take care of any change in the sequence of columns in different files
             if i == 0:
                 cols = df.columns
                 df = df.reindex(columns=cols)
 
+
+            # save y as label in targets
             self.targets.append(df[self.y])
+
+            # what's the below?
             self.dfs[i] = df[[col for col in df.columns if col not in self.y_cols]]
             self.columns = self.dfs[0].columns
 
+
+
+    #min_max normalization per file
     def _processinput(self, inputs):
         self.scalers = []  # list of scalers
         custom_print("Min Max Normalisation on Dataset ✓")
+        #todo is normalization done per file. It should be on training set, than same normalization of the training data, used on test data.
+
         for i in range(len(inputs)):
             scaler = MinMaxScaler()
             if self.add_crypto_id:
@@ -281,8 +309,14 @@ class Preprocess(object):
         return X_test_processed, X_val_processed
 
     def process(self):
+
+        # read in all the files and gather fileIDs
         self._collect_files()
+
+        # store y labels in target
         self._processtarget()
+
+        # get all the tensors (as lists for the moment):
         (
             X_train_list,
             y_train_list,
@@ -296,13 +330,16 @@ class Preprocess(object):
         procesed_X_test, procesed_X_val = self._prepare_test_val_set(
             X_test_list, X_val_list
         )
+
         X_train = procesed_X_train[0]
         y_train = np.array(y_train_list[0])
         X_test = procesed_X_test[0]
         y_test = np.array(y_test_list[0])
         X_val = procesed_X_val[0]
         y_val = np.array(y_val_list[0])
+
         # now we stack all the data
+        # todo: what is this stacking? When x and y pairs are formed they cannot be cross-file
         for i in range(1, len(procesed_X_train)):
             X_train = np.row_stack((X_train, procesed_X_train[i]))
             y_train = np.row_stack((y_train, np.array(y_train_list[i])))
