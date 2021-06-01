@@ -25,7 +25,7 @@ y_cols = [
 
 cols_to_pred = ["Sell_p40_a1"]
 
-datadir = "../dataset/demo/"
+datadir = "../dataset/hourly_demo/"
 last_x_days = 10
 batch_size = 200
 model_type = "Wavenet" # "Lstm" or "Wavenet"

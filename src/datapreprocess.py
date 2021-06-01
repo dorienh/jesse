@@ -42,19 +42,28 @@ class Preprocess(object):
         self.val_ratio = val_ratio
         self.timeframe = last_x_days
         self._flagpreprocess = False
-        self._flagtensors = False
+        self._flagtensors = False  #what is this?
+
+        # set PCA to false if None is fed as option:
         if pca_components == None:
             self.pca = False
         else:
             self.pca = True
 
     def _collect_files(self):
+
+        # get all files
         files = glob(f"{self.directory}/*.csv")
         custom_print("Collecting Files")
         self.dfs = [pd.read_csv(file) for file in files]
+        # storing a list of filenames
+        #todo this can create issues, because actually pairs occur multiple times but should not be normalized the same! Just normalize for each file, not per crypto pair
         self.cryptos = [os.path.split(file)[1].split("_")[1] for file in files]
+
         custom_print("Filling Nan Values ✓")
         custom_print("Imputing Nan Values ✓")
+
+        # for each file in all files
         for df in self.dfs:
             col1 = df.columns[0]
             if col1 != "date":
@@ -366,9 +375,13 @@ class Preprocess(object):
             self.y_val,
         )
 
+
+    # prepare data loaders
     def prepare_data_loaders(self, batch_size=64):
+        # what is this?
         if not self._flagtensors:
             if not self._flagpreprocess:
+                # do actual processing
                 self.process()
             self.prepare_tensors()
         self.y_train = F.one_hot(self.y_train.squeeze(), num_classes=2)
