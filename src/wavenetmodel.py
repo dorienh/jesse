@@ -169,11 +169,20 @@ class WaveNet_n_to_1(object):
                 f"Recall: {recall_score(y_test, np.round(preds[:,1]))}",
                 header=True,
             )
-            custom_print(
-                f"AOC Curve: {roc_auc_score(y_test, np.round(preds[:,1]))}", header=True
-            )
+
+            try:
+                custom_print(
+                    f"AOC Curve: {roc_auc_score(y_test, np.round(preds[:,1]))}", header=True
+                )
+            except:
+                custom_print(
+                    f"Only one class present in y_true. ROC AUC score is not defined in that case.", header=True
+                )
+
         fpr, tpr, thresholds = roc_curve(y_test, np.round(preds[:,1]),pos_label=2)
-        roc_auc = roc_auc_score(y_test, np.round(preds[:,1]))
+        try:
+            roc_auc = roc_auc_score(y_test, np.round(preds[:,1]))
+        except: roc_auc = 0
         plt.figure()
         lw = 2
         plt.plot(fpr, tpr, color='darkorange',
