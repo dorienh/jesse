@@ -23,11 +23,11 @@ y_cols = [
     "last_pivot",
 ]
 
-cols_to_pred = ["Sell_p40_a1"]
+cols_to_pred = ["Buy_p40_a1"]
 
-datadir = "../dataset/hourly_demo/"
-last_x_days = 10
-batch_size = 200
+datadir = "../dataset/daily/"
+last_x_days = 40
+batch_size = 500
 model_type = "Wavenet" # "Lstm" or "Wavenet"
 
 process = Preprocess(datadir, y_cols, cols_to_pred,last_x_days=last_x_days)
@@ -48,15 +48,10 @@ process = Preprocess(datadir, y_cols, cols_to_pred,last_x_days=last_x_days)
 # print(f"y_val Shape {y_val.shape}")
 # print(f"y_test Shape {y_test.shape}")
 
-
 dataloaders = process.prepare_data_loaders(batch_size)
-
-# import _pickle as pickle
-# with open('dataloaders.pickle', 'wb') as handle:
-#     pickle.dump(dataloaders, handle, -1) #, protocol=pickle.HIGHEST_PROTOCOL
-#     handle.close
-
-
+torch.save(dataloaders,'dataloader.pth')
+#save data loader
+dataloader = torch.load('dataloader.pth')
 num_epochs = 1  # 100 epochs
 learning_rate = 0.003  # 0.001 lr
 

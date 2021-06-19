@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import os
 from glob import glob
 import pandas as pd
@@ -42,54 +43,36 @@ class Preprocess(object):
         self.val_ratio = val_ratio
         self.timeframe = last_x_days
         self._flagpreprocess = False
-        self._flagtensors = False  #what is this?
-
-        # set PCA to false if None is fed as option:
+        self._flagtensors = False
         if pca_components == None:
             self.pca = False
         else:
             self.pca = True
 
     def _collect_files(self):
-
-        # get all files
         files = glob(f"{self.directory}/*.csv")
         custom_print("Collecting Files")
         self.dfs = [pd.read_csv(file) for file in files]
-        # storing a list of filenames
-        #todo this can create issues, because actually pairs occur multiple times but should not be normalized the same! Just normalize for each file, not per crypto pair
         self.cryptos = [os.path.split(file)[1].split("_")[1] for file in files]
-
         custom_print("Filling Nan Values ✓")
         custom_print("Imputing Nan Values ✓")
-
-        # for each file in all files
         for df in self.dfs:
             col1 = df.columns[0]
-            # make sure first column is called date:
             if col1 != "date":
                 df.rename(columns={col1: "date"}, inplace=True)
-            # fill the NA values
             df.fillna(method="ffill", inplace=True)
             dates = df.date
-            # drop the first column:
             df.drop(columns=["date"], inplace=True)
-            # This indirectly maps all BOOL values to 1's and 0's of type float64:
+            # This indirectly maps all BOOL values to 1's and 0's of type float64
             df *= 1.0
-            # This function maps inf->max and -inf->min for each column:
-            # todo, not sure this is the best strategy
+            # This function maps inf->max and -inf->min for each column
             df = df_utilities.impute(df)
-            # inserting the date again??? todo why?
             df.insert(0, column="date", value=dates)
 
-
-    # split up the data in train/test/val x/y
     def _split_data(self, X_list, y_list):
-
         custom_print("Split Dataset into Train,Val,Test Set ✓")
         # This is an additional step to filter out any crypto df with less than a significant amount of data (atleast 1000 rows).
-
-        # Completely optional - filter value could be batch size? todo
+        # Completely optional
         if self.filter_value:
             X_above_1k = []
             y_above_1k = []
@@ -108,9 +91,6 @@ class Preprocess(object):
         X_val_list = []
         y_val_list = []
 
-
-        #bookmark
-        # for each element of the file list:
         for i in range(len(X_list)):
             try:
                 X_train, X_test, y_train, y_test = train_test_split(
@@ -158,17 +138,12 @@ class Preprocess(object):
     def _processtarget(self):
         self.targets = []  # This will contain all the output columns for each df
 
-        # for each cell in the file list
         for i, df in enumerate(self.dfs):
-
-            # if we are feeding crypto_id to the network: we add a column with the ID
             if self.add_crypto_id:
                 custom_print("Adding Crypto ID column ✓")
-                # add this as an integer label
                 le = LabelEncoder()
                 le.fit(self.cryptos)
 
-                # remove possible already existing crypto_id
                 if "CryptoID" in df.columns:
                     del df["CryptoID"]
 
@@ -177,29 +152,18 @@ class Preprocess(object):
                 )
                 # adding unique id's for cryptos as an additional feature
                 # to make sure our model learns the uniqueness of each crypto
-
-
             # This step is to take care of any change in the sequence of columns in different files
             if i == 0:
                 cols = df.columns
                 df = df.reindex(columns=cols)
 
-
-            # save y as label in targets
             self.targets.append(df[self.y])
-
-            # what's the below?
             self.dfs[i] = df[[col for col in df.columns if col not in self.y_cols]]
             self.columns = self.dfs[0].columns
 
-
-
-    #min_max normalization per file
     def _processinput(self, inputs):
         self.scalers = []  # list of scalers
         custom_print("Min Max Normalisation on Dataset ✓")
-        #todo is normalization done per file. It should be on training set, than same normalization of the training data, used on test data.
-
         for i in range(len(inputs)):
             scaler = MinMaxScaler()
             if self.add_crypto_id:
@@ -309,14 +273,8 @@ class Preprocess(object):
         return X_test_processed, X_val_processed
 
     def process(self):
-
-        # read in all the files and gather fileIDs
         self._collect_files()
-
-        # store y labels in target
         self._processtarget()
-
-        # get all the tensors (as lists for the moment):
         (
             X_train_list,
             y_train_list,
@@ -330,26 +288,24 @@ class Preprocess(object):
         procesed_X_test, procesed_X_val = self._prepare_test_val_set(
             X_test_list, X_val_list
         )
-
-        X_train = procesed_X_train[0]
-        y_train = np.array(y_train_list[0])
-        X_test = procesed_X_test[0]
-        y_test = np.array(y_test_list[0])
-        X_val = procesed_X_val[0]
-        y_val = np.array(y_val_list[0])
-
+        X_train,y_train = self._convert_to_timeseries(procesed_X_train[0].values,y_train_list[0].values,self.timeframe)
+        X_test,y_test = self._convert_to_timeseries(procesed_X_test[0],y_test_list[0].values,self.timeframe)
+        X_val,y_val = self._convert_to_timeseries(procesed_X_val[0],y_val_list[0].values,self.timeframe)
         # now we stack all the data
-        # todo: what is this stacking? When x and y pairs are formed they cannot be cross-file
         for i in range(1, len(procesed_X_train)):
-            X_train = np.row_stack((X_train, procesed_X_train[i]))
-            y_train = np.row_stack((y_train, np.array(y_train_list[i])))
+            a,b = self._convert_to_timeseries(procesed_X_train[i].values,y_train_list[i].values,self.timeframe)
+            X_train = np.row_stack((X_train, a))
+            y_train = np.row_stack((y_train, b))
         for i in range(1, len(procesed_X_test)):
-            X_test = np.row_stack((X_test, procesed_X_test[i]))
-            y_test = np.row_stack((y_test, np.array(y_test_list[i])))
+            a,b = self._convert_to_timeseries(procesed_X_test[i],y_test_list[i].values,self.timeframe)
+            X_test = np.row_stack((X_test, a))
+            y_test = np.row_stack((y_test, b))
         for i in range(1, len(procesed_X_val)):
-            X_val = np.row_stack((X_val, procesed_X_val[i]))
-            y_val = np.row_stack((y_val, np.array(y_val_list[i])))
+            a,b = self._convert_to_timeseries(procesed_X_val[i],y_val_list[i].values,self.timeframe)
+            X_val = np.row_stack((X_val, a))
+            y_val = np.row_stack((y_val, b))
 
+        
         self.X_train = X_train
         self.X_test = X_test
         self.X_val = X_val
@@ -357,15 +313,6 @@ class Preprocess(object):
         self.y_test = y_test
         self.y_val = y_val
         self._flagpreprocess = True
-        self.X_train, self.y_train = self._convert_to_timeseries(
-            self.X_train, self.y_train, self.timeframe
-        )
-        self.X_val, self.y_val = self._convert_to_timeseries(
-            self.X_val, self.y_val, self.timeframe
-        )
-        self.X_test, self.y_test = self._convert_to_timeseries(
-            self.X_test, self.y_test, self.timeframe
-        )
 
         print(f"X_train Shape {self.X_train.shape}, Y_train Shape {self.y_train.shape}")
         print(f"X_test Shape {self.X_test.shape}, Y_test Shape{self.y_test.shape}")
@@ -379,17 +326,25 @@ class Preprocess(object):
             self.y_val,
         )
 
-    def _convert_to_timeseries(self, X, Y, timeframe):
-        x = []
-        y = []
-        for i in range(X.shape[0] // timeframe):
-            try:
-                y.append(Y[((i + 1) * timeframe) + 1])
-                x.append(X[i * timeframe : (i + 1) * timeframe])
-            except:
-                pass
-        return np.asarray(x), np.asarray(y)
+    def _convert_to_timeseries(self,X,Y, sub_window_size,
+                         stride_size=1,clearing_time_index=0):
+    
+        
+        if sub_window_size > X.shape[0]:
+            repeat = sub_window_size - X.shape[0] + 1
+            X = np.row_stack((X,np.tile(X[-1],(repeat,1))))
+            Y = np.row_stack((Y,np.tile(Y[-1],(repeat,1))))
+                
+        max_time = X.shape[0] - sub_window_size 
+        start = clearing_time_index + 1 - sub_window_size + 1
 
+        sub_windows = (
+            start + 
+            np.expand_dims(np.arange(sub_window_size), 0) +
+            np.expand_dims(np.arange(max_time + 1, step=stride_size), 0).T
+        )        
+        return X[sub_windows][:-1],Y[sub_windows][1:]
+    
     def prepare_tensors(self):
         if not self._flagpreprocess:
             self.process()
@@ -412,13 +367,9 @@ class Preprocess(object):
             self.y_val,
         )
 
-
-    # prepare data loaders
     def prepare_data_loaders(self, batch_size=64):
-        # what is this?
         if not self._flagtensors:
             if not self._flagpreprocess:
-                # do actual processing
                 self.process()
             self.prepare_tensors()
         self.y_train = F.one_hot(self.y_train.squeeze(), num_classes=2)
@@ -478,3 +429,5 @@ class Preprocess(object):
         test = torch.reshape(test, (test.shape[0], 1, test.shape[1]))
 
         return test
+
+
