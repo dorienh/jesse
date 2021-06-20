@@ -145,7 +145,7 @@ class WaveNet_n_to_1(object):
 
     def predict(self, testdata, target=None):
         self.model.eval()
-        testdata = testdata.to(self.device)
+        testdata = testdata.cuda()
         predictions = self.model(testdata.float()).detach().numpy()
         idxs = np.unique(np.where(np.isnan(predictions))[0]).tolist()
         preds = np.delete(predictions.copy(), idxs, axis=0)
@@ -169,20 +169,11 @@ class WaveNet_n_to_1(object):
                 f"Recall: {recall_score(y_test, np.round(preds[:,1]))}",
                 header=True,
             )
-
-            try:
-                custom_print(
-                    f"AOC Curve: {roc_auc_score(y_test, np.round(preds[:,1]))}", header=True
-                )
-            except:
-                custom_print(
-                    f"Only one class present in y_true. ROC AUC score is not defined in that case.", header=True
-                )
-
+            custom_print(
+                f"AOC Curve: {roc_auc_score(y_test, np.round(preds[:,1]))}", header=True
+            )
         fpr, tpr, thresholds = roc_curve(y_test, np.round(preds[:,1]),pos_label=2)
-        try:
-            roc_auc = roc_auc_score(y_test, np.round(preds[:,1]))
-        except: roc_auc = 0
+        roc_auc = roc_auc_score(y_test, np.round(preds[:,1]))
         plt.figure()
         lw = 2
         plt.plot(fpr, tpr, color='darkorange',
