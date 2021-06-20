@@ -52,7 +52,7 @@ process = Preprocess(datadir, y_cols, cols_to_pred,last_x_days=last_x_days)
 dataloaders = process.prepare_data_loaders(batch_size)
 
 
-torch.save(dataloader,'dataloader.pth')
+torch.save(dataloaders,'dataloader.pth')
 
 # and load it by
 # dataloader = torch.load('dataloader.pth')
