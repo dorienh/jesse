@@ -51,6 +51,12 @@ process = Preprocess(datadir, y_cols, cols_to_pred,last_x_days=last_x_days)
 
 dataloaders = process.prepare_data_loaders(batch_size)
 
+
+torch.save(dataloader,'dataloader.pth')
+
+# and load it by
+# dataloader = torch.load('dataloader.pth')
+
 # import _pickle as pickle
 # with open('dataloaders.pickle', 'wb') as handle:
 #     pickle.dump(dataloaders, handle, -1) #, protocol=pickle.HIGHEST_PROTOCOL
