@@ -1,8 +1,5 @@
 # jesse
 
-I am a professor in AI and need a well documented and best practices used PyTorch script for the following task (I would do it myself, but no time to code):
-
-
 
 1. Preprocessing [most already implemented, but needs error checking + PEP8 and improvements to file/class structure)]
 - load all of the .csv files included as data (there will be more in the future, so load all files in specified folder (either daily or hourly))
