@@ -32,7 +32,7 @@ Please check and address all the issues on Github.
 - create a predict function that loads the final production model on training + test set and feed in a csv from the data folder: 'production_data_for_new_prediction'
 - output dataframe with predictions
 - output confusion matrix for this data
-
+- allow me to control the threshold (0.5) for prediction cutoff so that I can increase the precision if needed.
 
 A. Variant: n-to-1
 
